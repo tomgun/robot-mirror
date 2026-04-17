@@ -5,8 +5,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Robot Mirror</title>
     <link rel="icon" type="image/svg+xml" href="/robot-mirror/favicon.svg" />
-    <script type="module" crossorigin src="/robot-mirror/assets/index-CbudhxgH.js"></script>
-    <link rel="stylesheet" crossorigin href="/robot-mirror/assets/index-Cf70fE1c.css">
+    <script type="module" crossorigin src="/robot-mirror/assets/index-DqcXtqBF.js"></script>
+    <link rel="stylesheet" crossorigin href="/robot-mirror/assets/index-BUo-tqnY.css">
   </head>
   <body>
     <video id="video" autoplay muted playsinline></video>
@@ -40,6 +40,11 @@
       <div id="keys">[V] camera view &nbsp; [F] fullscreen</div>
     </div>
 
+    <div id="leaderboard" class="hidden">
+      <div class="lb-title">LEADERBOARD</div>
+      <ol id="leaderboard-list"></ol>
+    </div>
+
     <div id="countdown" class="hidden"></div>
 
     <div id="game-hud" class="hidden">
@@ -69,6 +74,10 @@
       <div id="lobby-card">
         <h1>Robot Mirror</h1>
         <p>Multiplayer — see each other as pose-driven robots.</p>
+        <div class="name-row">
+          <label for="name-input">your name</label>
+          <input id="name-input" maxlength="16" autocomplete="off" />
+        </div>
         <div class="btn-row">
           <button id="host-btn" class="primary">Host a room</button>
           <div class="divider">or</div>
