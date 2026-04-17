@@ -3,7 +3,7 @@ import { LocalPlayer } from "./local_player.js";
 import { Net } from "./net.js";
 import { GestureGame } from "./game_mode.js";
 import { CoachSession } from "./coach.js";
-import { Metronome } from "./metronome.js";
+import { DrumMachine, playHitChime, playComboStab, playMissThud, speak } from "./sounds.js";
 
 const video = document.getElementById("video");
 const canvas = document.getElementById("scene");
@@ -46,7 +46,7 @@ let localPlayer = null;
 let localId = null;
 let game = null;
 let coach = null;
-let metronome = null;
+let drums = null;
 let myName = "";
 const peerNames = new Map();
 const peerScores = new Map();
@@ -267,17 +267,39 @@ function setModeButtonsDisabled(disabled) {
   aixerciseBtn.disabled = disabled;
 }
 
-function startMetronome(bpm) {
-  stopMetronome();
-  metronome = new Metronome({ bpm });
-  metronome.start();
+function startDrums(bpm, groove = "house") {
+  stopDrums();
+  drums = new DrumMachine({ bpm, groove });
+  drums.start();
 }
 
-function stopMetronome() {
-  if (metronome) {
-    metronome.stop();
-    metronome = null;
+function stopDrums() {
+  if (drums) {
+    drums.stop();
+    drums = null;
   }
+}
+
+const ENCOURAGEMENT_PHRASES = [
+  "Keep it up",
+  "Great form",
+  "Looking good",
+  "Nice work",
+  "You got this",
+  "Stay with it",
+  "Strong",
+  "Almost there",
+  "Beautiful",
+  "Don't stop",
+];
+let lastPhraseIndex = -1;
+function randomEncouragement() {
+  let i;
+  do {
+    i = Math.floor(Math.random() * ENCOURAGEMENT_PHRASES.length);
+  } while (i === lastPhraseIndex && ENCOURAGEMENT_PHRASES.length > 1);
+  lastPhraseIndex = i;
+  return ENCOURAGEMENT_PHRASES[i];
 }
 
 async function beginGestureGame({ seed, duration }) {
@@ -295,18 +317,28 @@ async function beginGestureGame({ seed, duration }) {
     gameTimerEl.textContent = Math.ceil(e.detail.timeLeft / 1000);
     setLocalScore(e.detail.score, String(e.detail.score));
   });
+  game.addEventListener("hit", (e) => {
+    const { combo } = e.detail;
+    if (combo > 0 && combo % 5 === 0) {
+      playComboStab(combo);
+      flashLabel(`${combo} combo!`);
+    } else {
+      playHitChime(Math.min(combo, 5));
+    }
+  });
+  game.addEventListener("wrong", () => playMissThud());
+  game.addEventListener("miss", () => playMissThud());
   game.addEventListener("tick", (e) => {
     gameTimerEl.textContent = Math.ceil(e.detail.timeLeft / 1000);
   });
   game.addEventListener("end", (e) => {
     gameHud.classList.add("hidden");
-    stopMetronome();
+    stopDrums();
     endScoreVal.textContent = e.detail.score;
     endComboVal.textContent = "max combo " + e.detail.maxCombo;
     document.querySelector("#game-end .end-title").textContent = "ROUND COMPLETE";
     gameEndEl.classList.remove("hidden");
     setModeButtonsDisabled(false);
-    // keep leaderboard visible for a few seconds after, then clear
     setTimeout(() => endLeaderboard(), 6000);
   });
 
@@ -315,7 +347,7 @@ async function beginGestureGame({ seed, duration }) {
   gameScoreEl.textContent = "0";
   gameComboEl.textContent = "×0";
   gameTimerEl.textContent = Math.ceil(duration / 1000);
-  startMetronome(100);
+  startDrums(100, "house");
   beginLeaderboard("gesture");
   game.start({ seed, duration });
 }
@@ -337,15 +369,25 @@ async function beginCoachSession() {
     coachMatch.classList.toggle("off", m < 50);
     setLocalScore(m, m + "%");
   });
+  coach.addEventListener("encourage", (e) => {
+    const phrase = e.detail.match >= 70
+      ? (Math.random() < 0.5 ? "Perfect!" : "Looking great!")
+      : randomEncouragement();
+    speak(phrase);
+  });
+  coach.addEventListener("exercise-change", (e) => {
+    speak(e.detail.title);
+  });
   coach.addEventListener("end", (e) => {
     coachHud.classList.add("hidden");
-    stopMetronome();
+    stopDrums();
     setModeButtonsDisabled(false);
     const avg = Math.round((e.detail?.avgMatch ?? 0) * 100);
     endScoreVal.textContent = avg + "%";
     endComboVal.textContent = "session match";
     document.querySelector("#game-end .end-title").textContent = "AIXERCISE COMPLETE";
     gameEndEl.classList.remove("hidden");
+    speak(avg >= 70 ? "Awesome session!" : avg >= 50 ? "Good work!" : "Well done, keep going!");
     setTimeout(() => endLeaderboard(), 6000);
   });
 
@@ -354,8 +396,9 @@ async function beginCoachSession() {
   coachTitle.textContent = "Get ready";
   coachReps.textContent = "0";
   coachTimer.textContent = "60";
-  startMetronome(70);
+  startDrums(84, "chill");
   beginLeaderboard("coach");
+  speak("Let's go!");
   coach.start();
 }
 

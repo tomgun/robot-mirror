@@ -156,6 +156,10 @@ export class CoachSession extends EventTarget {
     this.startTime = performance.now();
     this.stage.addCoachRobot();
     this._handle = setInterval(() => this._tick(), 33);
+    this._encourageHandle = setInterval(() => {
+      if (this.active) this._emit("encourage", { match: Math.round(this.matchEMA * 100) });
+    }, 10000);
+    this._lastAnnouncedExercise = null;
     this._tick();
   }
 
@@ -163,6 +167,7 @@ export class CoachSession extends EventTarget {
     if (!this.active) return;
     this.active = false;
     if (this._handle) { clearInterval(this._handle); this._handle = null; }
+    if (this._encourageHandle) { clearInterval(this._encourageHandle); this._encourageHandle = null; }
     this.stage.removeCoachRobot();
     const avg = this._matchSamples > 0 ? this._matchSum / this._matchSamples : 0.5;
     this._emit("end", { avgMatch: avg });
@@ -211,5 +216,10 @@ export class CoachSession extends EventTarget {
       timeLeft,
       match: Math.round(this.matchEMA * 100),
     });
+
+    if (this._lastAnnouncedExercise !== ex.name) {
+      this._lastAnnouncedExercise = ex.name;
+      this._emit("exercise-change", { title: ex.name });
+    }
   }
 }

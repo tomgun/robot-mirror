@@ -94,8 +94,10 @@ export class GestureGame extends EventTarget {
       if (!cue.scored && now > cue.hitAt + HIT_WINDOW_MS) {
         cue.scored = true;
         cue.result = "miss";
+        const hadCombo = this.combo;
         this.combo = 0;
         this.stage.markCue(cue.id, "miss");
+        if (hadCombo >= 3) this._emit("miss", { lostCombo: hadCombo });
         this._emit("update", { score: this.score, combo: this.combo, timeLeft });
       }
     }
@@ -129,11 +131,13 @@ export class GestureGame extends EventTarget {
       const comboBonus = Math.min(this.combo, 8) * 10;
       this.score += 100 + comboBonus;
       this.stage.markCue(best.id, "hit");
+      this._emit("hit", { combo: this.combo, score: this.score });
     } else {
       best.result = "wrong";
       this.combo = 0;
       this.score = Math.max(0, this.score - 20);
       this.stage.markCue(best.id, "wrong");
+      this._emit("wrong", { score: this.score });
     }
     this._emit("update", {
       score: this.score,
