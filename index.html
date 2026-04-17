@@ -12,7 +12,15 @@
     <canvas id="scene"></canvas>
 
     <div id="hud">
-      <div id="title">ROBOT MIRROR</div>
+      <div id="top-bar">
+        <div id="title">ROBOT MIRROR</div>
+        <div id="room-info" class="hidden">
+          Room <span id="room-code"></span>
+          <button id="copy-link" type="button">copy link</button>
+          <button id="face-toggle" type="button" aria-pressed="false">face: off</button>
+          <span id="peer-count">1 player</span>
+        </div>
+      </div>
       <div id="gesture-label">—</div>
       <div id="hint">
         <b>Gestures</b><br />
@@ -22,14 +30,23 @@
         <span>Thumbs Up — rainbow skin</span><br />
         <span>Pointing Up — lightning</span>
       </div>
-      <div id="keys">
-        [V] toggle camera view &nbsp; [F] fullscreen
-      </div>
+      <div id="keys">[V] camera view &nbsp; [F] fullscreen</div>
     </div>
 
-    <div id="start-overlay">
-      <button id="start-btn">Start Camera</button>
-      <p>Allow camera access to see yourself as a robot.</p>
+    <div id="lobby">
+      <div id="lobby-card">
+        <h1>Robot Mirror</h1>
+        <p>Multiplayer — see each other as pose-driven robots.</p>
+        <div class="btn-row">
+          <button id="host-btn" class="primary">Host a room</button>
+          <div class="divider">or</div>
+          <form id="join-form">
+            <input id="join-code" placeholder="room code" autocomplete="off" />
+            <button type="submit">Join</button>
+          </form>
+        </div>
+        <p id="lobby-status"></p>
+      </div>
     </div>
 
     <script type="module" src="/src/main.js"></script>

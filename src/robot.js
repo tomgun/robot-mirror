@@ -21,9 +21,9 @@ const Y_AXIS = new THREE.Vector3(0, 1, 0);
 function makeMetalMaterial(baseColor = 0x9fb3c8) {
   return new THREE.MeshStandardMaterial({
     color: baseColor,
-    metalness: 0.85,
-    roughness: 0.28,
-    emissive: 0x0a1220,
+    metalness: 0.2,
+    roughness: 0.7,
+    emissive: 0x050a14,
   });
 }
 
@@ -98,24 +98,71 @@ export class Robot {
     this._b = new THREE.Vector3();
     this._mid = new THREE.Vector3();
 
+    this.filters = null;
     this.smoothed = null;
-    this.smoothAlpha = 0.35;
+
+    this._faceImage = null;
+    this._facePlane = null;
+    this._faceTexture = null;
+    this._lastHeadCenter = new THREE.Vector3();
+    this._lastHeadSize = 0.15;
+  }
+
+  setFaceTexture(dataUrl) {
+    if (!dataUrl) return;
+    if (!this._faceImage) {
+      this._faceImage = new Image();
+      this._faceImage.onload = () => {
+        if (!this._facePlane) {
+          const tex = new THREE.Texture(this._faceImage);
+          tex.colorSpace = THREE.SRGBColorSpace;
+          const mat = new THREE.MeshBasicMaterial({
+            map: tex,
+            transparent: true,
+            depthWrite: false,
+            toneMapped: false,
+          });
+          const plane = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), mat);
+          plane.renderOrder = 5;
+          this._facePlane = plane;
+          this._faceTexture = tex;
+          this.group.add(plane);
+        }
+        this._faceTexture.needsUpdate = true;
+      };
+    }
+    this._faceImage.src = dataUrl;
+  }
+
+  clearFaceTexture() {
+    if (this._facePlane) {
+      this.group.remove(this._facePlane);
+      this._facePlane.geometry.dispose();
+      this._facePlane.material.dispose();
+      if (this._faceTexture) this._faceTexture.dispose();
+      this._facePlane = null;
+      this._faceTexture = null;
+      this._faceImage = null;
+    }
   }
 
   smoothLandmarks(raw) {
-    if (!this.smoothed || this.smoothed.length !== raw.length) {
+    const t = performance.now();
+    if (!this.filters || this.filters.length !== raw.length) {
+      this.filters = raw.map(() => [
+        new OneEuro(), new OneEuro(), new OneEuro(),
+      ]);
       this.smoothed = raw.map((lm) => ({
         x: lm.x, y: lm.y, z: lm.z, visibility: lm.visibility,
       }));
-      return this.smoothed;
     }
-    const a = this.smoothAlpha;
     for (let i = 0; i < raw.length; i++) {
-      const s = this.smoothed[i];
       const r = raw[i];
-      s.x += (r.x - s.x) * a;
-      s.y += (r.y - s.y) * a;
-      s.z += (r.z - s.z) * a;
+      const f = this.filters[i];
+      const s = this.smoothed[i];
+      s.x = f[0].filter(r.x, t);
+      s.y = f[1].filter(r.y, t);
+      s.z = f[2].filter(r.z, t);
       s.visibility = r.visibility;
     }
     return this.smoothed;
@@ -136,6 +183,7 @@ export class Robot {
     if (!rawLandmarks || rawLandmarks.length < 33) {
       this.group.visible = false;
       this.smoothed = null;
+      this.filters = null;
       return;
     }
     const landmarks = this.smoothLandmarks(rawLandmarks);
@@ -183,11 +231,20 @@ export class Robot {
     this.leftEye.scale.setScalar(headSize * 0.18);
     this.rightEye.scale.setScalar(headSize * 0.18);
 
+    this._lastHeadCenter.copy(headCenter);
+    this._lastHeadSize = headSize;
+
+    if (this._facePlane) {
+      this._facePlane.position.copy(headCenter);
+      this._facePlane.position.z += headSize * 0.55;
+      this._facePlane.scale.setScalar(headSize * 1.27);
+    }
+
     const antennaBase = headCenter.clone().addScaledVector(new THREE.Vector3(0, 1, 0), headSize * 0.85);
     const antennaTop = antennaBase.clone().addScaledVector(new THREE.Vector3(0, 1, 0), headSize * 0.9);
     alignBone(this.antenna, antennaBase, antennaTop, 0.02);
     this.antennaTip.position.copy(antennaTop);
-    this.antennaTip.scale.setScalar(0.05 + 0.01 * Math.sin(performance.now() * 0.01));
+    this.antennaTip.scale.setScalar(0.05);
 
     if (landmarks[15] && landmarks[15].visibility > 0.3) {
       landmarkToVec(landmarks[15], aspect, this.leftHand.position);
@@ -222,6 +279,41 @@ export class Robot {
       if (obj.geometry) obj.geometry.dispose();
       if (obj.material) obj.material.dispose();
     });
+  }
+}
+
+class OneEuro {
+  constructor(minCutoff = 0.6, beta = 0.004, dCutoff = 1.0) {
+    this.minCutoff = minCutoff;
+    this.beta = beta;
+    this.dCutoff = dCutoff;
+    this.xPrev = null;
+    this.dxPrev = 0;
+    this.tPrev = null;
+  }
+
+  _alpha(cutoff, dt) {
+    const r = 2 * Math.PI * cutoff * dt;
+    return r / (r + 1);
+  }
+
+  filter(x, t) {
+    if (this.tPrev === null) {
+      this.tPrev = t;
+      this.xPrev = x;
+      return x;
+    }
+    const dt = Math.max((t - this.tPrev) / 1000, 1e-4);
+    const dxRaw = (x - this.xPrev) / dt;
+    const aD = this._alpha(this.dCutoff, dt);
+    const dx = aD * dxRaw + (1 - aD) * this.dxPrev;
+    const cutoff = this.minCutoff + this.beta * Math.abs(dx);
+    const a = this._alpha(cutoff, dt);
+    const y = a * x + (1 - a) * this.xPrev;
+    this.xPrev = y;
+    this.dxPrev = dx;
+    this.tPrev = t;
+    return y;
   }
 }
 
