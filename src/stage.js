@@ -232,6 +232,30 @@ export class Stage {
     for (const r of this.robotsByPeer.values()) r.clearFaceTexture();
   }
 
+  addCoachRobot() {
+    if (this.coachRobot) return this.coachRobot;
+    const robot = new Robot(this.scene);
+    robot.group.position.set(0, 0, -0.8);
+    robot.group.scale.setScalar(1.35);
+    robot.material.color.setHex(0xf2a870);
+    robot.accentMaterial.color.setHex(0xc06b48);
+    robot.material.emissive.setHex(0x261205);
+    this.coachRobot = robot;
+    return robot;
+  }
+
+  removeCoachRobot() {
+    if (!this.coachRobot) return;
+    this.coachRobot.dispose();
+    this.coachRobot = null;
+  }
+
+  setCoachPose(landmarks, aspect) {
+    if (!this.coachRobot) return;
+    const dt = Math.min((performance.now() - this.lastFrameTime) / 1000, 0.05);
+    this.coachRobot.update(landmarks, aspect, dt);
+  }
+
   triggerEffect(peerId, name, wristLm, videoAspect) {
     const offset = this.robotsByPeer.get(peerId)?.group.position.x || 0;
     const world = landmarkToVec(wristLm, videoAspect, new THREE.Vector3());

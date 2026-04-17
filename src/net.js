@@ -198,7 +198,19 @@ export class Net extends EventTarget {
       case "face":
         this._emit("face", { peerId: fromShortId, img: msg.img });
         break;
+      case "game-start":
+        this._emit("game-start", {
+          peerId: fromShortId,
+          seed: msg.seed,
+          duration: msg.duration,
+          mode: msg.mode,
+        });
+        break;
     }
+  }
+
+  broadcastGameStart(seed, duration, mode) {
+    this._sendAll({ t: "game-start", seed, duration, mode });
   }
 
   broadcastFace(img) {

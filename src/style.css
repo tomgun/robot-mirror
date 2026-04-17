@@ -72,7 +72,7 @@ html, body {
 #room-info.hidden { display: none; }
 #room-code { font-family: ui-monospace, monospace; color: #9ecbff; font-weight: 600; }
 #peer-count { opacity: 0.6; }
-#copy-link, #mic-toggle, #game-btn {
+#copy-link, #mic-toggle, #game-btn, #aixercise-btn {
   font: inherit;
   font-size: 12px;
   background: rgba(158, 203, 255, 0.15);
@@ -82,13 +82,19 @@ html, body {
   padding: 2px 10px;
   cursor: pointer;
 }
-#copy-link:hover, #mic-toggle:hover, #game-btn:hover { background: rgba(158, 203, 255, 0.28); }
+#copy-link:hover, #mic-toggle:hover, #game-btn:hover, #aixercise-btn:hover { background: rgba(158, 203, 255, 0.28); }
 #game-btn {
   background: linear-gradient(135deg, #2c54a8, #1a2a4a);
   border-color: rgba(158, 203, 255, 0.6);
   font-weight: 600;
 }
-#game-btn:disabled { opacity: 0.55; cursor: not-allowed; }
+#aixercise-btn {
+  background: linear-gradient(135deg, #a8562c, #4a1f0b);
+  border-color: rgba(255, 160, 120, 0.5);
+  color: #ffe1cf;
+  font-weight: 600;
+}
+#game-btn:disabled, #aixercise-btn:disabled { opacity: 0.55; cursor: not-allowed; }
 #mic-toggle[aria-pressed="true"] {
   background: rgba(255, 120, 120, 0.35);
   border-color: rgba(255, 140, 140, 0.7);
@@ -328,3 +334,36 @@ html, body {
   letter-spacing: 0.15em;
 }
 #end-close:hover { filter: brightness(1.15); }
+
+#coach-hud {
+  position: absolute;
+  top: 70px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 3;
+  display: flex;
+  gap: 24px;
+  padding: 10px 22px;
+  background: rgba(40, 20, 10, 0.65);
+  border: 1px solid rgba(255, 160, 120, 0.3);
+  border-radius: 18px;
+  backdrop-filter: blur(8px);
+  align-items: center;
+  pointer-events: auto;
+}
+#coach-hud.hidden { display: none; }
+#coach-hud .stat { display: flex; flex-direction: column; align-items: center; min-width: 60px; }
+#coach-hud .stat.title { min-width: 120px; }
+#coach-hud .stat.title span { font-size: 18px; color: #ffcfa6; font-weight: 700; letter-spacing: 0.05em; }
+#coach-hud label { font-size: 10px; opacity: 0.6; letter-spacing: 0.2em; text-transform: uppercase; }
+#coach-hud span { font-size: 24px; font-weight: 800; color: #ffcfa6; line-height: 1.15; }
+#coach-stop {
+  font: inherit; font-size: 12px;
+  padding: 4px 12px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 160, 120, 0.5);
+  background: rgba(40, 20, 10, 0.6);
+  color: #ffcfa6;
+  cursor: pointer;
+}
+#coach-stop:hover { filter: brightness(1.2); }

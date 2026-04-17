@@ -2,6 +2,8 @@ import { Stage } from "./stage.js";
 import { LocalPlayer } from "./local_player.js";
 import { Net } from "./net.js";
 import { GestureGame } from "./game_mode.js";
+import { CoachSession } from "./coach.js";
+import { Metronome } from "./metronome.js";
 
 const video = document.getElementById("video");
 const canvas = document.getElementById("scene");
@@ -18,6 +20,7 @@ const faceToggleBtn = document.getElementById("face-toggle");
 const peerCountEl = document.getElementById("peer-count");
 const gestureLabel = document.getElementById("gesture-label");
 const gameBtn = document.getElementById("game-btn");
+const aixerciseBtn = document.getElementById("aixercise-btn");
 const countdownEl = document.getElementById("countdown");
 const gameHud = document.getElementById("game-hud");
 const gameScoreEl = document.getElementById("game-score");
@@ -27,12 +30,19 @@ const gameEndEl = document.getElementById("game-end");
 const endScoreVal = document.getElementById("end-score-val");
 const endComboVal = document.getElementById("end-combo-val");
 const endCloseBtn = document.getElementById("end-close");
+const coachHud = document.getElementById("coach-hud");
+const coachTitle = document.getElementById("coach-title");
+const coachReps = document.getElementById("coach-reps");
+const coachTimer = document.getElementById("coach-timer");
+const coachStop = document.getElementById("coach-stop");
 
 let stage = null;
 let net = null;
 let localPlayer = null;
 let localId = null;
 let game = null;
+let coach = null;
+let metronome = null;
 
 // Prefill join code from URL hash
 const hashMatch = window.location.hash.match(/room=([A-Z0-9]+)/i);
@@ -163,10 +173,28 @@ async function runCountdown() {
   countdownEl.classList.add("hidden");
 }
 
-async function startGame() {
+function setModeButtonsDisabled(disabled) {
+  gameBtn.disabled = disabled;
+  aixerciseBtn.disabled = disabled;
+}
+
+function startMetronome(bpm) {
+  stopMetronome();
+  metronome = new Metronome({ bpm });
+  metronome.start();
+}
+
+function stopMetronome() {
+  if (metronome) {
+    metronome.stop();
+    metronome = null;
+  }
+}
+
+async function beginGestureGame({ seed, duration }) {
   if (!stage || !localId) return;
-  if (game?.active) return;
-  gameBtn.disabled = true;
+  if (game?.active || coach?.active) return;
+  setModeButtonsDisabled(true);
   gameEndEl.classList.add("hidden");
 
   const localRobot = stage.robotsByPeer.get(localId);
@@ -182,21 +210,65 @@ async function startGame() {
   });
   game.addEventListener("end", (e) => {
     gameHud.classList.add("hidden");
+    stopMetronome();
     endScoreVal.textContent = e.detail.score;
     endComboVal.textContent = e.detail.maxCombo;
     gameEndEl.classList.remove("hidden");
-    gameBtn.disabled = false;
+    setModeButtonsDisabled(false);
   });
 
   await runCountdown();
   gameHud.classList.remove("hidden");
   gameScoreEl.textContent = "0";
   gameComboEl.textContent = "×0";
-  gameTimerEl.textContent = "45";
-  game.start({ seed: Date.now() & 0xffffffff, duration: 45000 });
+  gameTimerEl.textContent = Math.ceil(duration / 1000);
+  startMetronome(100);
+  game.start({ seed, duration });
 }
 
-gameBtn.addEventListener("click", startGame);
+async function beginCoachSession() {
+  if (!stage || !localId) return;
+  if (game?.active || coach?.active) return;
+  setModeButtonsDisabled(true);
+
+  coach = new CoachSession({ stage });
+  coach.addEventListener("update", (e) => {
+    coachTitle.textContent = e.detail.title;
+    coachReps.textContent = e.detail.rep;
+    coachTimer.textContent = Math.ceil(e.detail.timeLeft / 1000);
+  });
+  coach.addEventListener("end", () => {
+    coachHud.classList.add("hidden");
+    stopMetronome();
+    setModeButtonsDisabled(false);
+  });
+
+  await runCountdown();
+  coachHud.classList.remove("hidden");
+  coachTitle.textContent = "Get ready";
+  coachReps.textContent = "0";
+  coachTimer.textContent = "60";
+  startMetronome(70);
+  coach.start();
+}
+
+gameBtn.addEventListener("click", () => {
+  const seed = Date.now() & 0xffffffff;
+  const duration = 45000;
+  if (net) net.broadcastGameStart(seed, duration, "gesture");
+  beginGestureGame({ seed, duration });
+});
+
+aixerciseBtn.addEventListener("click", () => {
+  const seed = Date.now() & 0xffffffff;
+  if (net) net.broadcastGameStart(seed, 60000, "coach");
+  beginCoachSession();
+});
+
+coachStop.addEventListener("click", () => {
+  if (coach?.active) coach.stop();
+});
+
 endCloseBtn.addEventListener("click", () => gameEndEl.classList.add("hidden"));
 
 async function startSession({ role, roomCode }) {
@@ -243,6 +315,11 @@ async function startSession({ role, roomCode }) {
     const { peerId, img } = e.detail;
     if (!img) stage.clearFace(peerId);
     else stage.setFace(peerId, img);
+  });
+  net.addEventListener("game-start", (e) => {
+    const { mode, seed, duration } = e.detail;
+    if (mode === "coach") beginCoachSession();
+    else beginGestureGame({ seed, duration });
   });
 
   setStatus("Starting camera…");
