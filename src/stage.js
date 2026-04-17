@@ -235,8 +235,9 @@ export class Stage {
   addCoachRobot() {
     if (this.coachRobot) return this.coachRobot;
     const robot = new Robot(this.scene);
-    robot.group.position.set(0, 0, -0.8);
-    robot.group.scale.setScalar(1.35);
+    // Tuck the coach in upper-right, smaller, so player images don't cover it
+    robot.group.position.set(1.6, 0.7, -0.1);
+    robot.group.scale.setScalar(0.65);
     robot.material.color.setHex(0xf2a870);
     robot.accentMaterial.color.setHex(0xc06b48);
     robot.material.emissive.setHex(0x261205);

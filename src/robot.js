@@ -165,6 +165,28 @@ export class Robot {
       s.z = f[2].filter(r.z, t);
       s.visibility = r.visibility;
     }
+
+    // Re-center so the player sits in their slot regardless of where they
+    // are in the camera frame. Use mid-hip when visible, else mid-shoulder.
+    const lh = this.smoothed[23], rh = this.smoothed[24];
+    const ls = this.smoothed[11], rs = this.smoothed[12];
+    let cx = 0.5, cy = 0.6;
+    if (lh && rh && (lh.visibility ?? 1) > 0.3 && (rh.visibility ?? 1) > 0.3) {
+      cx = (lh.x + rh.x) / 2;
+      cy = (lh.y + rh.y) / 2;
+    } else if (ls && rs && (ls.visibility ?? 1) > 0.3 && (rs.visibility ?? 1) > 0.3) {
+      cx = (ls.x + rs.x) / 2;
+      cy = (ls.y + rs.y) / 2 + 0.25;
+    }
+    const offX = 0.5 - cx;
+    const offY = 0.6 - cy;
+    if (Math.abs(offX) < 0.5 && Math.abs(offY) < 0.5) {
+      for (const s of this.smoothed) {
+        s.x += offX;
+        s.y += offY;
+      }
+    }
+
     return this.smoothed;
   }
 
