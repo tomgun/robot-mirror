@@ -17,7 +17,11 @@ export class Net extends EventTarget {
     this.roomCode = roomCode || makeRoomCode();
     this.peerId = PREFIX + this.roomCode + (role === "join" ? "_" + Math.random().toString(36).slice(2, 8) : "");
     this.peer = null;
-    this.connections = new Map(); // remotePeerId (short form) -> DataConnection
+    this.connections = new Map(); // shortId -> DataConnection
+    this.outgoingCalls = new Map(); // shortId -> MediaConnection (we initiated, we're sending)
+    this.incomingCalls = new Map(); // shortId -> MediaConnection (we answered, we're receiving)
+    this.audioElements = new Map(); // shortId -> <audio>
+    this.localMicStream = null;
     this.lastPoseSend = 0;
   }
 
@@ -54,7 +58,80 @@ export class Net extends EventTarget {
         }
       });
       this.peer.on("connection", (conn) => this._registerConn(conn));
+      this.peer.on("call", (call) => this._handleIncomingCall(call));
     });
+  }
+
+  _handleIncomingCall(call) {
+    const shortId = this._shortId(call.peer);
+    // Answer without sending audio — pure receive, so presence of mic on this side doesn't matter
+    try {
+      call.answer();
+    } catch {
+      return;
+    }
+    call.on("stream", (remoteStream) => this._attachRemoteAudio(shortId, remoteStream));
+    call.on("close", () => this._detachRemoteAudio(shortId));
+    call.on("error", () => this._detachRemoteAudio(shortId));
+    this.incomingCalls.set(shortId, call);
+  }
+
+  _attachRemoteAudio(shortId, stream) {
+    let el = this.audioElements.get(shortId);
+    if (!el) {
+      el = document.createElement("audio");
+      el.autoplay = true;
+      el.playsInline = true;
+      el.dataset.peer = shortId;
+      el.style.display = "none";
+      document.body.appendChild(el);
+      this.audioElements.set(shortId, el);
+    }
+    el.srcObject = stream;
+    el.play().catch(() => {});
+  }
+
+  _detachRemoteAudio(shortId) {
+    const el = this.audioElements.get(shortId);
+    if (el) {
+      try { el.srcObject = null; } catch {}
+      el.remove();
+      this.audioElements.delete(shortId);
+    }
+    const mc = this.incomingCalls.get(shortId);
+    if (mc) {
+      try { mc.close(); } catch {}
+      this.incomingCalls.delete(shortId);
+    }
+  }
+
+  _initiateCall(shortId) {
+    if (!this.localMicStream) return;
+    if (this.outgoingCalls.has(shortId)) return;
+    const fullId = PREFIX + shortId;
+    const call = this.peer.call(fullId, this.localMicStream);
+    if (!call) return;
+    call.on("close", () => this.outgoingCalls.delete(shortId));
+    call.on("error", () => this.outgoingCalls.delete(shortId));
+    this.outgoingCalls.set(shortId, call);
+  }
+
+  enableMic(stream) {
+    this.localMicStream = stream;
+    for (const shortId of this.connections.keys()) {
+      this._initiateCall(shortId);
+    }
+  }
+
+  disableMic() {
+    for (const [shortId, call] of this.outgoingCalls) {
+      try { call.close(); } catch {}
+    }
+    this.outgoingCalls.clear();
+    if (this.localMicStream) {
+      for (const t of this.localMicStream.getTracks()) t.stop();
+      this.localMicStream = null;
+    }
   }
 
   _registerConn(conn) {
@@ -72,6 +149,8 @@ export class Net extends EventTarget {
           conn.send({ t: "peers", ids: others });
         } catch {}
       }
+      // If our mic is on, call the new peer so they hear us
+      if (this.localMicStream) this._initiateCall(shortId);
     });
 
     conn.on("data", (data) => this._handleData(shortId, data));
@@ -83,6 +162,10 @@ export class Net extends EventTarget {
   _onConnClosed(shortId) {
     if (!this.connections.has(shortId)) return;
     this.connections.delete(shortId);
+    // Also teardown any media with this peer
+    const out = this.outgoingCalls.get(shortId);
+    if (out) { try { out.close(); } catch {} this.outgoingCalls.delete(shortId); }
+    this._detachRemoteAudio(shortId);
     this._emit("peer-removed", { peerId: shortId });
   }
 
@@ -177,6 +260,10 @@ export class Net extends EventTarget {
       try { conn.close(); } catch {}
     }
     this.connections.clear();
+    this.disableMic();
+    for (const shortId of Array.from(this.incomingCalls.keys())) {
+      this._detachRemoteAudio(shortId);
+    }
     if (this.peer) {
       try { this.peer.destroy(); } catch {}
     }

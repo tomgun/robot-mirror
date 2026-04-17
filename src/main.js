@@ -12,6 +12,7 @@ const statusEl = document.getElementById("lobby-status");
 const roomInfo = document.getElementById("room-info");
 const roomCodeEl = document.getElementById("room-code");
 const copyLinkBtn = document.getElementById("copy-link");
+const micToggleBtn = document.getElementById("mic-toggle");
 const faceToggleBtn = document.getElementById("face-toggle");
 const peerCountEl = document.getElementById("peer-count");
 const gestureLabel = document.getElementById("gesture-label");
@@ -33,15 +34,60 @@ joinForm.addEventListener("submit", (e) => {
   startSession({ role: "join", roomCode: code });
 });
 
-faceToggleBtn.addEventListener("click", () => {
+micToggleBtn.addEventListener("click", async () => {
+  if (!net) return;
+  const on = micToggleBtn.getAttribute("aria-pressed") !== "true";
+  if (on) {
+    micToggleBtn.disabled = true;
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        audio: {
+          echoCancellation: true,
+          noiseSuppression: true,
+          autoGainControl: true,
+        },
+      });
+      net.enableMic(stream);
+      micToggleBtn.setAttribute("aria-pressed", "true");
+      micToggleBtn.textContent = "mic: on";
+    } catch (err) {
+      console.error(err);
+      alert("Microphone error: " + (err?.message || err));
+    } finally {
+      micToggleBtn.disabled = false;
+    }
+  } else {
+    net.disableMic();
+    micToggleBtn.setAttribute("aria-pressed", "false");
+    micToggleBtn.textContent = "mic: off";
+  }
+});
+
+function setFaceMode(on) {
   if (!localPlayer) return;
-  const on = !localPlayer.faceEnabled;
   localPlayer.faceEnabled = on;
   faceToggleBtn.setAttribute("aria-pressed", String(on));
-  faceToggleBtn.textContent = on ? "face: on" : "face: off";
+  faceToggleBtn.querySelector(".left").classList.toggle("active", !on);
+  faceToggleBtn.querySelector(".right").classList.toggle("active", on);
   if (!on) {
     stage.clearFace(localId);
-    net.broadcastFace(""); // empty string signals clear
+    net.broadcastFace("");
+  }
+}
+
+faceToggleBtn.addEventListener("click", (e) => {
+  if (!localPlayer) return;
+  const target = e.target.closest(".opt");
+  if (target) {
+    setFaceMode(target.classList.contains("right"));
+  } else {
+    setFaceMode(!localPlayer.faceEnabled);
+  }
+});
+faceToggleBtn.addEventListener("keydown", (e) => {
+  if (e.key === "Enter" || e.key === " ") {
+    e.preventDefault();
+    if (localPlayer) setFaceMode(!localPlayer.faceEnabled);
   }
 });
 

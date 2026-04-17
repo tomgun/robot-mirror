@@ -12,6 +12,9 @@ dist
 dist-ssr
 *.local
 
+# workflow file stashed until container token has workflow scope
+.github/workflows/deploy.yml
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json

@@ -230,6 +230,9 @@ export class Robot {
       .add(eyeOffset);
     this.leftEye.scale.setScalar(headSize * 0.18);
     this.rightEye.scale.setScalar(headSize * 0.18);
+    const faceOn = !!this._facePlane;
+    this.leftEye.visible = !faceOn;
+    this.rightEye.visible = !faceOn;
 
     this._lastHeadCenter.copy(headCenter);
     this._lastHeadSize = headSize;

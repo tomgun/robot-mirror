@@ -8,7 +8,7 @@
     "build": "vite build",
     "preview": "vite preview",
     "predeploy": "npm run build && touch dist/.nojekyll",
-    "deploy": "gh-pages -d dist --dotfiles -m \"Deploy $(date -u +%FT%TZ)\""
+    "deploy": "gh-pages -d dist --dotfiles -u \"tomgun <tomas.s.gunther@gmail.com>\" -m \"Deploy $(date -u +%FT%TZ)\""
   },
   "devDependencies": {
     "gh-pages": "^6.3.0",

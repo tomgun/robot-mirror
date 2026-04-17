@@ -72,7 +72,7 @@ html, body {
 #room-info.hidden { display: none; }
 #room-code { font-family: ui-monospace, monospace; color: #9ecbff; font-weight: 600; }
 #peer-count { opacity: 0.6; }
-#copy-link, #face-toggle {
+#copy-link, #mic-toggle {
   font: inherit;
   font-size: 12px;
   background: rgba(158, 203, 255, 0.15);
@@ -82,11 +82,40 @@ html, body {
   padding: 2px 10px;
   cursor: pointer;
 }
-#copy-link:hover, #face-toggle:hover { background: rgba(158, 203, 255, 0.28); }
-#face-toggle[aria-pressed="true"] {
-  background: rgba(158, 203, 255, 0.45);
-  border-color: rgba(158, 203, 255, 0.8);
+#copy-link:hover, #mic-toggle:hover { background: rgba(158, 203, 255, 0.28); }
+#mic-toggle[aria-pressed="true"] {
+  background: rgba(255, 120, 120, 0.35);
+  border-color: rgba(255, 140, 140, 0.7);
   color: #fff;
+}
+
+#face-toggle {
+  display: inline-flex;
+  align-items: stretch;
+  padding: 2px;
+  background: rgba(158, 203, 255, 0.1);
+  border: 1px solid rgba(158, 203, 255, 0.3);
+  border-radius: 999px;
+  cursor: pointer;
+  user-select: none;
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  outline: none;
+}
+#face-toggle:hover { background: rgba(158, 203, 255, 0.18); }
+#face-toggle:focus-visible { box-shadow: 0 0 0 2px rgba(158, 203, 255, 0.6); }
+#face-toggle .opt {
+  padding: 4px 12px;
+  border-radius: 999px;
+  color: #9eb4d8;
+  transition: background 0.2s ease, color 0.2s ease;
+  white-space: nowrap;
+}
+#face-toggle .opt.active {
+  background: linear-gradient(135deg, #4a79d8, #2c54a8);
+  color: #fff;
+  font-weight: 600;
+  box-shadow: 0 2px 10px rgba(74, 121, 216, 0.4);
 }
 
 #gesture-label {
