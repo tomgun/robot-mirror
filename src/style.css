@@ -322,7 +322,6 @@ html, body {
 .end-title { font-size: 12px; letter-spacing: 0.35em; opacity: 0.6; }
 .end-score { font-size: 96px; font-weight: 900; color: #9ecbff; line-height: 1; margin: 8px 0 4px; text-shadow: 0 0 32px rgba(158, 203, 255, 0.5); }
 .end-combo { opacity: 0.7; margin-bottom: 24px; font-size: 14px; letter-spacing: 0.1em; }
-.end-combo span { color: #fff; font-weight: 700; }
 #end-close {
   font: inherit; font-size: 14px;
   padding: 10px 32px;
@@ -357,6 +356,9 @@ html, body {
 #coach-hud .stat.title span { font-size: 18px; color: #ffcfa6; font-weight: 700; letter-spacing: 0.05em; }
 #coach-hud label { font-size: 10px; opacity: 0.6; letter-spacing: 0.2em; text-transform: uppercase; }
 #coach-hud span { font-size: 24px; font-weight: 800; color: #ffcfa6; line-height: 1.15; }
+#coach-match.great { color: #9aff9a; }
+#coach-match.good { color: #ffcc66; }
+#coach-match.off { color: #ff9090; }
 #coach-stop {
   font: inherit; font-size: 12px;
   padding: 4px 12px;

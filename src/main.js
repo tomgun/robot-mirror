@@ -33,6 +33,7 @@ const endCloseBtn = document.getElementById("end-close");
 const coachHud = document.getElementById("coach-hud");
 const coachTitle = document.getElementById("coach-title");
 const coachReps = document.getElementById("coach-reps");
+const coachMatch = document.getElementById("coach-match");
 const coachTimer = document.getElementById("coach-timer");
 const coachStop = document.getElementById("coach-stop");
 
@@ -212,7 +213,8 @@ async function beginGestureGame({ seed, duration }) {
     gameHud.classList.add("hidden");
     stopMetronome();
     endScoreVal.textContent = e.detail.score;
-    endComboVal.textContent = e.detail.maxCombo;
+    endComboVal.textContent = "max combo " + e.detail.maxCombo;
+    document.querySelector("#game-end .end-title").textContent = "ROUND COMPLETE";
     gameEndEl.classList.remove("hidden");
     setModeButtonsDisabled(false);
   });
@@ -236,11 +238,21 @@ async function beginCoachSession() {
     coachTitle.textContent = e.detail.title;
     coachReps.textContent = e.detail.rep;
     coachTimer.textContent = Math.ceil(e.detail.timeLeft / 1000);
+    const m = e.detail.match;
+    coachMatch.textContent = m + "%";
+    coachMatch.classList.toggle("great", m >= 75);
+    coachMatch.classList.toggle("good", m >= 50 && m < 75);
+    coachMatch.classList.toggle("off", m < 50);
   });
-  coach.addEventListener("end", () => {
+  coach.addEventListener("end", (e) => {
     coachHud.classList.add("hidden");
     stopMetronome();
     setModeButtonsDisabled(false);
+    const avg = Math.round((e.detail?.avgMatch ?? 0) * 100);
+    endScoreVal.textContent = avg + "%";
+    endComboVal.textContent = "session match";
+    document.querySelector("#game-end .end-title").textContent = "AIXERCISE COMPLETE";
+    gameEndEl.classList.remove("hidden");
   });
 
   await runCountdown();
@@ -332,6 +344,7 @@ async function startSession({ role, roomCode }) {
       }
       stage.setPose(localId, landmarks, aspect);
       net.broadcastPose(landmarks, aspect);
+      if (coach?.active) coach.scorePlayer(landmarks);
     };
     localPlayer.onGesture = (name, handLms, aspect) => {
       const wrist = handLms?.[0];

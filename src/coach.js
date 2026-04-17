@@ -100,6 +100,38 @@ function kneeLifts(pose, phase) {
   pose[16].y = 0.58 - 0.1 * rightLift;
 }
 
+const MATCH_SEGMENTS = [
+  [11, 15], [12, 16],
+  [23, 27], [24, 28],
+  [11, 13], [12, 14],
+  [13, 15], [14, 16],
+  [23, 25], [24, 26],
+  [25, 27], [26, 28],
+];
+
+function matchPoses(coach, player) {
+  let sum = 0, count = 0;
+  for (const [a, b] of MATCH_SEGMENTS) {
+    const ca = coach[a], cb = coach[b];
+    const pa = player[a], pb = player[b];
+    if (!ca || !cb || !pa || !pb) continue;
+    if ((pa.visibility ?? 1) < 0.3 || (pb.visibility ?? 1) < 0.3) continue;
+    // mirror coach X so both describe motion in the same screen direction
+    const cdx = (1 - cb.x) - (1 - ca.x);
+    const cdy = cb.y - ca.y;
+    const pdx = pb.x - pa.x;
+    const pdy = pb.y - pa.y;
+    const clen = Math.hypot(cdx, cdy);
+    const plen = Math.hypot(pdx, pdy);
+    if (clen < 0.02 || plen < 0.02) continue;
+    const cos = (cdx * pdx + cdy * pdy) / (clen * plen);
+    sum += (cos + 1) / 2;
+    count++;
+  }
+  if (count === 0) return 0.5;
+  return sum / count;
+}
+
 export class CoachSession extends EventTarget {
   constructor({ stage }) {
     super();
@@ -108,6 +140,10 @@ export class CoachSession extends EventTarget {
     this.startTime = 0;
     this._handle = null;
     this.totalDuration = EXERCISES.reduce((s, e) => s + e.durationMs, 0);
+    this.lastCoachPose = null;
+    this.matchEMA = 0.5;
+    this._matchSum = 0;
+    this._matchSamples = 0;
   }
 
   _emit(type, detail) {
@@ -128,7 +164,16 @@ export class CoachSession extends EventTarget {
     this.active = false;
     if (this._handle) { clearInterval(this._handle); this._handle = null; }
     this.stage.removeCoachRobot();
-    this._emit("end", {});
+    const avg = this._matchSamples > 0 ? this._matchSum / this._matchSamples : 0.5;
+    this._emit("end", { avgMatch: avg });
+  }
+
+  scorePlayer(playerPose) {
+    if (!this.active || !this.lastCoachPose || !playerPose) return;
+    const m = matchPoses(this.lastCoachPose, playerPose);
+    this.matchEMA = this.matchEMA * 0.75 + m * 0.25;
+    this._matchSum += this.matchEMA;
+    this._matchSamples++;
   }
 
   _currentExercise(elapsedMs) {
@@ -156,6 +201,7 @@ export class CoachSession extends EventTarget {
     const pose = makeBasePose();
     ex.fn(pose, phase);
     this.stage.setCoachPose(pose, 1.0);
+    this.lastCoachPose = pose;
 
     const rep = Math.floor(exElapsed / ex.periodMs);
     const timeLeft = this.totalDuration - elapsed;
@@ -163,6 +209,7 @@ export class CoachSession extends EventTarget {
       title: ex.name,
       rep,
       timeLeft,
+      match: Math.round(this.matchEMA * 100),
     });
   }
 }
