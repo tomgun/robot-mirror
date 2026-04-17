@@ -5,8 +5,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Robot Mirror</title>
     <link rel="icon" type="image/svg+xml" href="/robot-mirror/favicon.svg" />
-    <script type="module" crossorigin src="/robot-mirror/assets/index-CN_9g6pF.js"></script>
-    <link rel="stylesheet" crossorigin href="/robot-mirror/assets/index-Bvfvo3NT.css">
+    <script type="module" crossorigin src="/robot-mirror/assets/index-DhkERC53.js"></script>
+    <link rel="stylesheet" crossorigin href="/robot-mirror/assets/index-5TpcadBx.css">
   </head>
   <body>
     <video id="video" autoplay muted playsinline></video>
@@ -20,6 +20,7 @@
           <button id="copy-link" type="button">copy link</button>
           <button id="mic-toggle" type="button" aria-pressed="false">mic: off</button>
           <button id="game-btn" type="button">▶ Start Game</button>
+          <button id="aixercise-btn" type="button">🤸 AIxercise</button>
           <div id="face-toggle" role="button" tabindex="0" aria-pressed="false" aria-label="Toggle face overlay">
             <span class="opt left active">Digital Realities</span>
             <span class="opt right">Added Humanity</span>
@@ -45,6 +46,13 @@
       <div class="stat"><label>score</label><span id="game-score">0</span></div>
       <div class="stat"><label>combo</label><span id="game-combo">×0</span></div>
       <div class="stat"><label>time</label><span id="game-timer">45</span></div>
+    </div>
+
+    <div id="coach-hud" class="hidden">
+      <div class="stat title"><span id="coach-title">Get ready</span></div>
+      <div class="stat"><label>reps</label><span id="coach-reps">0</span></div>
+      <div class="stat"><label>time</label><span id="coach-timer">60</span></div>
+      <button id="coach-stop" type="button">Stop</button>
     </div>
 
     <div id="game-end" class="hidden">
