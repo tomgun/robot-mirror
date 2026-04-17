@@ -284,22 +284,50 @@ export class Stage {
 
   showHitLine(show) {
     if (show && !this.hitLineMesh) {
-      const geom = new THREE.PlaneGeometry(6, 0.05);
-      const mat = new THREE.MeshBasicMaterial({
+      const group = new THREE.Group();
+      // Wide glowing band (visual hit zone)
+      const bandGeom = new THREE.PlaneGeometry(8, 0.36);
+      const bandMat = new THREE.ShaderMaterial({
+        transparent: true,
+        depthWrite: false,
+        blending: THREE.AdditiveBlending,
+        uniforms: { uColor: { value: new THREE.Color(0x6ab0ff) } },
+        vertexShader: `varying vec2 vUv; void main(){ vUv=uv; gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.); }`,
+        fragmentShader: `
+          varying vec2 vUv;
+          uniform vec3 uColor;
+          void main(){
+            float d = abs(vUv.y - 0.5) * 2.0;
+            float a = smoothstep(1.0, 0.0, d) * 0.45;
+            gl_FragColor = vec4(uColor, a);
+          }`,
+      });
+      const band = new THREE.Mesh(bandGeom, bandMat);
+      band.position.z = 0.15;
+      group.add(band);
+
+      // Crisp centerline
+      const lineGeom = new THREE.PlaneGeometry(7.5, 0.025);
+      const lineMat = new THREE.MeshBasicMaterial({
         color: 0x9ecbff,
         transparent: true,
-        opacity: 0.35,
+        opacity: 0.85,
         blending: THREE.AdditiveBlending,
         depthWrite: false,
         toneMapped: false,
       });
-      this.hitLineMesh = new THREE.Mesh(geom, mat);
-      this.hitLineMesh.position.set(0, 0, 0.2);
-      this.scene.add(this.hitLineMesh);
+      const line = new THREE.Mesh(lineGeom, lineMat);
+      line.position.z = 0.2;
+      group.add(line);
+
+      this.hitLineMesh = group;
+      this.scene.add(group);
     } else if (!show && this.hitLineMesh) {
       this.scene.remove(this.hitLineMesh);
-      this.hitLineMesh.geometry.dispose();
-      this.hitLineMesh.material.dispose();
+      this.hitLineMesh.traverse((obj) => {
+        if (obj.geometry) obj.geometry.dispose();
+        if (obj.material) obj.material.dispose();
+      });
       this.hitLineMesh = null;
     }
   }

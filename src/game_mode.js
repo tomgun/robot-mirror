@@ -6,7 +6,7 @@ const GESTURES = [
   "Pointing_Up",
 ];
 
-const HIT_WINDOW_MS = 400;
+const HIT_WINDOW_MS = 250;
 const TRAVEL_MS = 2500;
 const SPAWN_INTERVAL_MS = 1400;
 const DURATION_MS = 45000;
