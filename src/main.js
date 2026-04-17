@@ -1,6 +1,7 @@
 import { Stage } from "./stage.js";
 import { LocalPlayer } from "./local_player.js";
 import { Net } from "./net.js";
+import { GestureGame } from "./game_mode.js";
 
 const video = document.getElementById("video");
 const canvas = document.getElementById("scene");
@@ -16,11 +17,22 @@ const micToggleBtn = document.getElementById("mic-toggle");
 const faceToggleBtn = document.getElementById("face-toggle");
 const peerCountEl = document.getElementById("peer-count");
 const gestureLabel = document.getElementById("gesture-label");
+const gameBtn = document.getElementById("game-btn");
+const countdownEl = document.getElementById("countdown");
+const gameHud = document.getElementById("game-hud");
+const gameScoreEl = document.getElementById("game-score");
+const gameComboEl = document.getElementById("game-combo");
+const gameTimerEl = document.getElementById("game-timer");
+const gameEndEl = document.getElementById("game-end");
+const endScoreVal = document.getElementById("end-score-val");
+const endComboVal = document.getElementById("end-combo-val");
+const endCloseBtn = document.getElementById("end-close");
 
 let stage = null;
 let net = null;
 let localPlayer = null;
 let localId = null;
+let game = null;
 
 // Prefill join code from URL hash
 const hashMatch = window.location.hash.match(/room=([A-Z0-9]+)/i);
@@ -132,6 +144,61 @@ function flashLabel(name) {
   flashLabel._t = setTimeout(() => gestureLabel.classList.remove("active"), 550);
 }
 
+function sleep(ms) { return new Promise((r) => setTimeout(r, ms)); }
+
+async function runCountdown() {
+  countdownEl.classList.remove("hidden");
+  for (let i = 3; i >= 1; i--) {
+    countdownEl.textContent = String(i);
+    countdownEl.classList.remove("pop");
+    void countdownEl.offsetWidth;
+    countdownEl.classList.add("pop");
+    await sleep(800);
+  }
+  countdownEl.textContent = "GO";
+  countdownEl.classList.remove("pop");
+  void countdownEl.offsetWidth;
+  countdownEl.classList.add("pop");
+  await sleep(600);
+  countdownEl.classList.add("hidden");
+}
+
+async function startGame() {
+  if (!stage || !localId) return;
+  if (game?.active) return;
+  gameBtn.disabled = true;
+  gameEndEl.classList.add("hidden");
+
+  const localRobot = stage.robotsByPeer.get(localId);
+  const laneX = localRobot?.group.position.x ?? 0;
+  game = new GestureGame({ stage, laneX });
+  game.addEventListener("update", (e) => {
+    gameScoreEl.textContent = e.detail.score;
+    gameComboEl.textContent = "×" + e.detail.combo;
+    gameTimerEl.textContent = Math.ceil(e.detail.timeLeft / 1000);
+  });
+  game.addEventListener("tick", (e) => {
+    gameTimerEl.textContent = Math.ceil(e.detail.timeLeft / 1000);
+  });
+  game.addEventListener("end", (e) => {
+    gameHud.classList.add("hidden");
+    endScoreVal.textContent = e.detail.score;
+    endComboVal.textContent = e.detail.maxCombo;
+    gameEndEl.classList.remove("hidden");
+    gameBtn.disabled = false;
+  });
+
+  await runCountdown();
+  gameHud.classList.remove("hidden");
+  gameScoreEl.textContent = "0";
+  gameComboEl.textContent = "×0";
+  gameTimerEl.textContent = "45";
+  game.start({ seed: Date.now() & 0xffffffff, duration: 45000 });
+}
+
+gameBtn.addEventListener("click", startGame);
+endCloseBtn.addEventListener("click", () => gameEndEl.classList.add("hidden"));
+
 async function startSession({ role, roomCode }) {
   setButtonsDisabled(true);
   setStatus(role === "host" ? "Creating room…" : `Joining ${roomCode}…`);
@@ -195,6 +262,7 @@ async function startSession({ role, roomCode }) {
       stage.triggerEffect(localId, name, wrist, aspect);
       net.broadcastGesture(name, wrist, aspect);
       flashLabel(name);
+      if (game?.active) game.onLocalGesture(name);
     };
     localPlayer.onFace = (img) => {
       stage.setFace(localId, img);

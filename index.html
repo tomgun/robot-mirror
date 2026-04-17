@@ -18,6 +18,7 @@
           Room <span id="room-code"></span>
           <button id="copy-link" type="button">copy link</button>
           <button id="mic-toggle" type="button" aria-pressed="false">mic: off</button>
+          <button id="game-btn" type="button">▶ Start Game</button>
           <div id="face-toggle" role="button" tabindex="0" aria-pressed="false" aria-label="Toggle face overlay">
             <span class="opt left active">Digital Realities</span>
             <span class="opt right">Added Humanity</span>
@@ -35,6 +36,23 @@
         <span>Pointing Up — lightning</span>
       </div>
       <div id="keys">[V] camera view &nbsp; [F] fullscreen</div>
+    </div>
+
+    <div id="countdown" class="hidden"></div>
+
+    <div id="game-hud" class="hidden">
+      <div class="stat"><label>score</label><span id="game-score">0</span></div>
+      <div class="stat"><label>combo</label><span id="game-combo">×0</span></div>
+      <div class="stat"><label>time</label><span id="game-timer">45</span></div>
+    </div>
+
+    <div id="game-end" class="hidden">
+      <div class="end-card">
+        <div class="end-title">ROUND COMPLETE</div>
+        <div class="end-score"><span id="end-score-val">0</span></div>
+        <div class="end-combo">max combo <span id="end-combo-val">0</span></div>
+        <button id="end-close" type="button">Close</button>
+      </div>
     </div>
 
     <div id="lobby">

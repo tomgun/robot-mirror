@@ -11,6 +11,48 @@ import { Fireworks, Shockwaves, Lightning, WarpShader } from "./effects.js";
 const MAX_PLAYERS = 4;
 const SLOT_SPACING = 1.6;
 
+const CUE_INFO = {
+  Open_Palm:   { emoji: "✋", color: "#ffe066" },
+  Closed_Fist: { emoji: "✊", color: "#6688ff" },
+  Victory:     { emoji: "✌", color: "#ffbb66" },
+  Thumb_Up:    { emoji: "👍", color: "#88ff88" },
+  Pointing_Up: { emoji: "☝", color: "#cc88ff" },
+};
+
+function buildCueCanvas(gestureName) {
+  const info = CUE_INFO[gestureName] || { emoji: "?", color: "#ffffff" };
+  const size = 256;
+  const c = document.createElement("canvas");
+  c.width = c.height = size;
+  const ctx = c.getContext("2d");
+
+  const grad = ctx.createRadialGradient(size / 2, size / 2, 30, size / 2, size / 2, size / 2);
+  grad.addColorStop(0, info.color + "99");
+  grad.addColorStop(0.55, info.color + "44");
+  grad.addColorStop(1, info.color + "00");
+  ctx.fillStyle = grad;
+  ctx.fillRect(0, 0, size, size);
+
+  ctx.fillStyle = "rgba(10, 16, 30, 0.85)";
+  ctx.beginPath();
+  ctx.arc(size / 2, size / 2, size / 2 - 32, 0, Math.PI * 2);
+  ctx.fill();
+
+  ctx.strokeStyle = info.color;
+  ctx.lineWidth = 8;
+  ctx.beginPath();
+  ctx.arc(size / 2, size / 2, size / 2 - 32, 0, Math.PI * 2);
+  ctx.stroke();
+
+  ctx.font = "bold 130px 'Apple Color Emoji', 'Segoe UI Emoji', system-ui";
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  ctx.fillStyle = "#fff";
+  ctx.fillText(info.emoji, size / 2, size / 2 + 8);
+
+  return c;
+}
+
 export class Stage {
   constructor({ canvas }) {
     this.canvas = canvas;
@@ -96,6 +138,10 @@ export class Stage {
 
     this.warpStrength = 0;
     this.lastFrameTime = performance.now();
+
+    this.cues = new Map(); // id -> { sprite, spawnAt, hitAt, laneX, result, resultAt }
+    this._cueIdCounter = 0;
+    this.hitLineMesh = null;
 
     window.addEventListener("resize", () => this.handleResize());
   }
@@ -212,6 +258,99 @@ export class Stage {
     }
   }
 
+  showHitLine(show) {
+    if (show && !this.hitLineMesh) {
+      const geom = new THREE.PlaneGeometry(6, 0.05);
+      const mat = new THREE.MeshBasicMaterial({
+        color: 0x9ecbff,
+        transparent: true,
+        opacity: 0.35,
+        blending: THREE.AdditiveBlending,
+        depthWrite: false,
+        toneMapped: false,
+      });
+      this.hitLineMesh = new THREE.Mesh(geom, mat);
+      this.hitLineMesh.position.set(0, 0, 0.2);
+      this.scene.add(this.hitLineMesh);
+    } else if (!show && this.hitLineMesh) {
+      this.scene.remove(this.hitLineMesh);
+      this.hitLineMesh.geometry.dispose();
+      this.hitLineMesh.material.dispose();
+      this.hitLineMesh = null;
+    }
+  }
+
+  spawnCue(gestureName, spawnAt, hitAt, laneX = 0) {
+    const id = ++this._cueIdCounter;
+    const canvas = buildCueCanvas(gestureName);
+    const tex = new THREE.CanvasTexture(canvas);
+    tex.colorSpace = THREE.SRGBColorSpace;
+    const mat = new THREE.SpriteMaterial({
+      map: tex,
+      transparent: true,
+      depthWrite: false,
+      toneMapped: false,
+      opacity: 1,
+    });
+    const sprite = new THREE.Sprite(mat);
+    sprite.scale.set(0.45, 0.45, 1);
+    sprite.position.set(laneX, 1.8, 0.25);
+    sprite.renderOrder = 8;
+    this.scene.add(sprite);
+
+    this.cues.set(id, {
+      sprite, tex, spawnAt, hitAt, laneX,
+      gesture: gestureName,
+      result: null,
+      resultAt: 0,
+    });
+    return id;
+  }
+
+  markCue(id, result) {
+    const cue = this.cues.get(id);
+    if (!cue || cue.result) return;
+    cue.result = result;
+    cue.resultAt = performance.now();
+    const flashColor = result === "hit" ? 0x99ffaa : result === "wrong" ? 0xff7788 : 0x888899;
+    cue.sprite.material.color = new THREE.Color(flashColor);
+  }
+
+  destroyCue(id) {
+    const cue = this.cues.get(id);
+    if (!cue) return;
+    this.scene.remove(cue.sprite);
+    cue.sprite.material.map.dispose();
+    cue.sprite.material.dispose();
+    this.cues.delete(id);
+  }
+
+  clearAllCues() {
+    for (const id of Array.from(this.cues.keys())) this.destroyCue(id);
+  }
+
+  _updateCues(now) {
+    for (const [id, cue] of this.cues) {
+      const t = (now - cue.spawnAt) / (cue.hitAt - cue.spawnAt);
+      const y = 1.8 + (0 - 1.8) * t;
+      cue.sprite.position.y = y;
+      const dt = Math.abs(now - cue.hitAt);
+      const pulse = dt < 250 ? 1 + 0.15 * Math.cos((dt / 250) * Math.PI) : 1;
+      cue.sprite.scale.set(0.45 * pulse, 0.45 * pulse, 1);
+
+      if (cue.result) {
+        const age = now - cue.resultAt;
+        cue.sprite.material.opacity = Math.max(1 - age / 500, 0);
+        if (cue.result === "hit") {
+          cue.sprite.position.y += age * 0.002;
+        }
+        if (age > 600) this.destroyCue(id);
+      } else if (t > 1.4) {
+        this.markCue(id, "miss");
+      }
+    }
+  }
+
   render() {
     const now = performance.now();
     const dt = Math.min((now - this.lastFrameTime) / 1000, 0.05);
@@ -220,6 +359,7 @@ export class Stage {
     this.fireworks.update(dt);
     this.shockwaves.update(dt);
     this.lightning.update(dt);
+    this._updateCues(now);
 
     this.warpStrength = Math.max(this.warpStrength - dt * 1.1, 0);
     this.warpPass.uniforms.uTime.value = now * 0.001;
