@@ -11,6 +11,7 @@ const lobby = document.getElementById("lobby");
 const hostBtn = document.getElementById("host-btn");
 const joinForm = document.getElementById("join-form");
 const joinInput = document.getElementById("join-code");
+const nameInput = document.getElementById("name-input");
 const statusEl = document.getElementById("lobby-status");
 const roomInfo = document.getElementById("room-info");
 const roomCodeEl = document.getElementById("room-code");
@@ -18,6 +19,8 @@ const copyLinkBtn = document.getElementById("copy-link");
 const micToggleBtn = document.getElementById("mic-toggle");
 const faceToggleBtn = document.getElementById("face-toggle");
 const peerCountEl = document.getElementById("peer-count");
+const leaderboardEl = document.getElementById("leaderboard");
+const leaderboardList = document.getElementById("leaderboard-list");
 const gestureLabel = document.getElementById("gesture-label");
 const gameBtn = document.getElementById("game-btn");
 const aixerciseBtn = document.getElementById("aixercise-btn");
@@ -44,6 +47,31 @@ let localId = null;
 let game = null;
 let coach = null;
 let metronome = null;
+let myName = "";
+const peerNames = new Map();
+const peerScores = new Map();
+let currentMode = null;
+let lastScoreBroadcast = 0;
+
+const ANIMALS = ["Fox", "Owl", "Lynx", "Bear", "Wolf", "Hare", "Otter", "Hawk", "Moth", "Ibex"];
+const COLORS = ["Neon", "Amber", "Azure", "Crimson", "Violet", "Jade", "Cobalt", "Coral", "Mint", "Pearl"];
+function generateName() {
+  const a = COLORS[Math.floor(Math.random() * COLORS.length)];
+  const b = ANIMALS[Math.floor(Math.random() * ANIMALS.length)];
+  return `${a} ${b}`;
+}
+
+(function initName() {
+  const stored = localStorage.getItem("robot-mirror:name") || "";
+  myName = stored || generateName();
+  nameInput.value = myName;
+})();
+
+nameInput.addEventListener("input", () => {
+  myName = nameInput.value.trim() || generateName();
+  localStorage.setItem("robot-mirror:name", nameInput.value.trim());
+  if (net) net.broadcastName(myName);
+});
 
 // Prefill join code from URL hash
 const hashMatch = window.location.hash.match(/room=([A-Z0-9]+)/i);
@@ -148,6 +176,66 @@ function updatePeerCount() {
   peerCountEl.textContent = n === 1 ? "1 player" : `${n} players`;
 }
 
+function displayName(peerId) {
+  if (peerId === localId) return myName;
+  return peerNames.get(peerId) || peerId;
+}
+
+function renderLeaderboard() {
+  if (!currentMode) {
+    leaderboardEl.classList.add("hidden");
+    leaderboardList.innerHTML = "";
+    return;
+  }
+  const entries = [];
+  for (const [pid, s] of peerScores) {
+    entries.push({ pid, score: s.score, label: s.label });
+  }
+  entries.sort((a, b) => b.score - a.score);
+  leaderboardList.innerHTML = "";
+  entries.forEach((e, i) => {
+    const li = document.createElement("li");
+    if (e.pid === localId) li.classList.add("self");
+    const rank = document.createElement("span");
+    rank.className = "rank";
+    rank.textContent = `${i + 1}.`;
+    const name = document.createElement("span");
+    name.className = "name";
+    name.textContent = displayName(e.pid);
+    const val = document.createElement("span");
+    val.className = "val";
+    val.textContent = e.label || String(e.score);
+    li.appendChild(rank);
+    li.appendChild(name);
+    li.appendChild(val);
+    leaderboardList.appendChild(li);
+  });
+  leaderboardEl.classList.remove("hidden");
+}
+
+function setLocalScore(score, label) {
+  peerScores.set(localId, { score, label });
+  renderLeaderboard();
+  // throttle broadcast
+  const now = performance.now();
+  if (now - lastScoreBroadcast > 500 && net) {
+    lastScoreBroadcast = now;
+    net.broadcastScore(currentMode, score, label);
+  }
+}
+
+function beginLeaderboard(mode) {
+  currentMode = mode;
+  peerScores.clear();
+  setLocalScore(0, mode === "coach" ? "0%" : "0");
+}
+
+function endLeaderboard() {
+  currentMode = null;
+  peerScores.clear();
+  leaderboardEl.classList.add("hidden");
+}
+
 function flashLabel(name) {
   gestureLabel.textContent = name.replace(/_/g, " ");
   gestureLabel.classList.add("active");
@@ -205,6 +293,7 @@ async function beginGestureGame({ seed, duration }) {
     gameScoreEl.textContent = e.detail.score;
     gameComboEl.textContent = "×" + e.detail.combo;
     gameTimerEl.textContent = Math.ceil(e.detail.timeLeft / 1000);
+    setLocalScore(e.detail.score, String(e.detail.score));
   });
   game.addEventListener("tick", (e) => {
     gameTimerEl.textContent = Math.ceil(e.detail.timeLeft / 1000);
@@ -217,6 +306,8 @@ async function beginGestureGame({ seed, duration }) {
     document.querySelector("#game-end .end-title").textContent = "ROUND COMPLETE";
     gameEndEl.classList.remove("hidden");
     setModeButtonsDisabled(false);
+    // keep leaderboard visible for a few seconds after, then clear
+    setTimeout(() => endLeaderboard(), 6000);
   });
 
   await runCountdown();
@@ -225,6 +316,7 @@ async function beginGestureGame({ seed, duration }) {
   gameComboEl.textContent = "×0";
   gameTimerEl.textContent = Math.ceil(duration / 1000);
   startMetronome(100);
+  beginLeaderboard("gesture");
   game.start({ seed, duration });
 }
 
@@ -243,6 +335,7 @@ async function beginCoachSession() {
     coachMatch.classList.toggle("great", m >= 75);
     coachMatch.classList.toggle("good", m >= 50 && m < 75);
     coachMatch.classList.toggle("off", m < 50);
+    setLocalScore(m, m + "%");
   });
   coach.addEventListener("end", (e) => {
     coachHud.classList.add("hidden");
@@ -253,6 +346,7 @@ async function beginCoachSession() {
     endComboVal.textContent = "session match";
     document.querySelector("#game-end .end-title").textContent = "AIXERCISE COMPLETE";
     gameEndEl.classList.remove("hidden");
+    setTimeout(() => endLeaderboard(), 6000);
   });
 
   await runCountdown();
@@ -261,6 +355,7 @@ async function beginCoachSession() {
   coachReps.textContent = "0";
   coachTimer.textContent = "60";
   startMetronome(70);
+  beginLeaderboard("coach");
   coach.start();
 }
 
@@ -289,6 +384,7 @@ async function startSession({ role, roomCode }) {
 
   try {
     net = new Net({ role, roomCode });
+    net.myName = myName;
     await net.connect();
   } catch (err) {
     console.error(err);
@@ -332,6 +428,19 @@ async function startSession({ role, roomCode }) {
     const { mode, seed, duration } = e.detail;
     if (mode === "coach") beginCoachSession();
     else beginGestureGame({ seed, duration });
+  });
+  net.addEventListener("name", (e) => {
+    peerNames.set(e.detail.peerId, e.detail.name);
+    renderLeaderboard();
+  });
+  net.addEventListener("score", (e) => {
+    if (e.detail.mode !== currentMode) return;
+    peerScores.set(e.detail.peerId, { score: e.detail.score, label: e.detail.label });
+    renderLeaderboard();
+  });
+  net.addEventListener("peer-added", (e) => {
+    // Send our name to new peer
+    if (myName && net) net.broadcastName(myName);
   });
 
   setStatus("Starting camera…");

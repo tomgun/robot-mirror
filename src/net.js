@@ -151,6 +151,10 @@ export class Net extends EventTarget {
       }
       // If our mic is on, call the new peer so they hear us
       if (this.localMicStream) this._initiateCall(shortId);
+      // Send our name immediately so they can show it
+      if (this.myName) {
+        try { conn.send({ t: "name", name: this.myName }); } catch {}
+      }
     });
 
     conn.on("data", (data) => this._handleData(shortId, data));
@@ -206,11 +210,31 @@ export class Net extends EventTarget {
           mode: msg.mode,
         });
         break;
+      case "name":
+        this._emit("name", { peerId: fromShortId, name: msg.name });
+        break;
+      case "score":
+        this._emit("score", {
+          peerId: fromShortId,
+          mode: msg.mode,
+          score: msg.score,
+          label: msg.label,
+        });
+        break;
     }
   }
 
   broadcastGameStart(seed, duration, mode) {
     this._sendAll({ t: "game-start", seed, duration, mode });
+  }
+
+  broadcastName(name) {
+    this.myName = name;
+    this._sendAll({ t: "name", name });
+  }
+
+  broadcastScore(mode, score, label) {
+    this._sendAll({ t: "score", mode, score, label });
   }
 
   broadcastFace(img) {
